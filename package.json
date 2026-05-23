@@ -1,0 +1,15 @@
+{
+  "name": "checkers",
+  "private": true,
+  "packageManager": "pnpm@10.30.3",
+  "engines": { "node": ">=22" },
+  "pnpm": { "onlyBuiltDependencies": ["esbuild"] },
+  "scripts": {
+    "dev": "pnpm --filter @checkers/web dev",
+    "build": "pnpm --filter @checkers/web build",
+    "preview": "pnpm --filter @checkers/web preview",
+    "typecheck": "pnpm --filter @checkers/web exec tsc -b",
+    "test": "pnpm --filter @checkers/web test",
+    "deploy": "wrangler deploy"
+  }
+}

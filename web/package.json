@@ -1,0 +1,25 @@
+{
+  "name": "@checkers/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@progamestore/games": "^0.2.0",
+    "react": "^19",
+    "react-dom": "^19"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.3",
+    "typescript": "^5.7",
+    "vite": "^6",
+    "vitest": "^4.1.5"
+  }
+}
