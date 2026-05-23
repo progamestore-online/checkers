@@ -221,19 +221,27 @@ export class GameDO extends DurableObject {
 }
 
 // --- Worker ---
+// Multiplayer API only. Static SPA is served from R2 by the host worker.
 
 interface Env {
   GAME: DurableObjectNamespace;
-  ASSETS: { fetch: (req: Request) => Promise<Response> };
 }
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
     const url = new URL(req.url);
 
+    // CORS for cross-origin WebSocket + fetch from the R2-hosted SPA
+    const corsHeaders: Record<string, string> = {
+      'Access-Control-Allow-Origin': req.headers.get('Origin') || '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    };
+    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
+
     if (url.pathname === '/api/rooms/new') {
       if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-      return Response.json({ roomId: randomId() });
+      return Response.json({ roomId: randomId() }, { headers: corsHeaders });
     }
 
     const wsMatch = url.pathname.match(/^\/api\/rooms\/([a-z0-9-]+)\/ws$/);
@@ -245,11 +253,6 @@ export default {
       return obj.fetch(req);
     }
 
-    if (url.pathname.startsWith('/g/')) {
-      url.pathname = '/';
-      return env.ASSETS.fetch(new Request(url.toString(), req));
-    }
-
-    return env.ASSETS.fetch(req);
+    return new Response('Not found', { status: 404 });
   },
 };

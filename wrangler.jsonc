@@ -1,16 +1,11 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "checkers",
+  "name": "progamestore-checkers",
   "main": "src/worker.ts",
   "compatibility_date": "2026-05-01",
 
-  // Worker serves both the static SPA and WebSocket multiplayer routes.
-  // Using Workers (not Pages) because Pages can't declare Durable Objects.
-  "assets": {
-    "directory": "./web/dist",
-    "binding": "ASSETS",
-    "not_found_handling": "single-page-application"
-  },
+  // Multiplayer Worker only — serves /api/rooms/* for WebSocket DO.
+  // Static SPA is hosted on R2 via the shared host worker.
 
   "durable_objects": {
     "bindings": [{ "name": "GAME", "class_name": "GameDO" }]
@@ -19,6 +14,6 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameDO"] }],
 
   "routes": [
-    { "pattern": "checkers.progamestore.online", "zone_name": "progamestore.online", "custom_domain": true }
+    { "pattern": "checkers.progamestore.online/api/*", "zone_name": "progamestore.online" }
   ]
 }
