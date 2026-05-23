@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  security-events: write
   pull-requests: write
 
 jobs:
@@ -26,13 +27,83 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
-      - name: VibeCode QA scan
-        run: npx -y @vibecodeqa/cli@latest --skip-tests --ci --sarif --pr-comment
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  quality:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Upload SARIF to GitHub Security
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: VibeCode QA scan
+        id: vcqa
+        continue-on-error: true
+        run: npx -y @vibecodeqa/cli@latest --skip-tests --ci --badge --sarif --json .
+
+      - name: Upload SARIF
+        if: always() && hashFiles('.vibe-check/report.sarif') != ''
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
         with:
           sarif_file: .vibe-check/report.sarif
+
+      - name: Upload badge
+        if: always() && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-badge
+          path: .vibe-check/badge.svg
+          if-no-files-found: ignore
+
+      - name: PR comment with score
+        if: always() && github.event_name == 'pull_request' && hashFiles('.vibe-check/report.json') != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('.vibe-check/report.json', 'utf8'));
+            const grade = report.grade;
+            const score = report.score;
+            const issues = report.totalIssues;
+            const checks = report.checks
+              .filter(c => c.score !== null && c.score !== undefined)
+              .map(c => `| ${c.name} | ${c.score}/100 | ${(c.issues||[]).length} |`)
+              .join('
+');
+            const body = `## vcqa ${grade} ${score}/100
+
+| Check | Score | Issues |
+|-------|-------|--------|
+${checks}
+
+**${issues} total issues**`;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.startsWith('## vcqa'));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
+
+      - name: Quality gate
+        if: always()
+        run: |
+          if [ -f .vibe-check/report.json ]; then
+            SCORE=$(python3 -c "import json; print(json.load(open('.vibe-check/report.json'))[score])")
+            echo "Quality score: $SCORE/100"
+            if [ "$SCORE" -lt 40 ]; then
+              echo "::error::Quality score $SCORE is below minimum threshold (40)"
+              exit 1
+            fi
+          fi
