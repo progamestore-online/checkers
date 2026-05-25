@@ -29,7 +29,6 @@ jobs:
 
   quality:
     runs-on: ubuntu-latest
-    needs: build
     steps:
       - uses: actions/checkout@v4
 
@@ -75,15 +74,16 @@ jobs:
             const checks = report.checks
               .filter(c => c.score !== null && c.score !== undefined)
               .map(c => `| ${c.name} | ${c.score}/100 | ${(c.issues||[]).length} |`)
-              .join('
-');
-            const body = `## vcqa ${grade} ${score}/100
-
-| Check | Score | Issues |
-|-------|-------|--------|
-${checks}
-
-**${issues} total issues**`;
+              .join('\n');
+            const body = [
+              `## vcqa ${grade} ${score}/100`,
+              '',
+              '| Check | Score | Issues |',
+              '|-------|-------|--------|',
+              checks,
+              '',
+              `**${issues} total issues**`
+            ].join('\n');
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -100,7 +100,7 @@ ${checks}
         if: always()
         run: |
           if [ -f .vibe-check/report.json ]; then
-            SCORE=$(python3 -c "import json; print(json.load(open('.vibe-check/report.json'))[score])")
+            SCORE=$(python3 -c "import json; print(json.load(open('.vibe-check/report.json'))['score'])")
             echo "Quality score: $SCORE/100"
             if [ "$SCORE" -lt 40 ]; then
               echo "::error::Quality score $SCORE is below minimum threshold (40)"
